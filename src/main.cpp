@@ -246,7 +246,7 @@ const std::vector<list<__u16>> & Main::setupUinputMap() {
 
 	if (uinputCecMap.empty()) {
 		uinputCecMap.resize(CEC_USER_CONTROL_CODE_MAX + 1, {});
-		uinputCecMap[CEC_USER_CONTROL_CODE_SELECT                      ] = { KEY_OK };
+		uinputCecMap[CEC_USER_CONTROL_CODE_SELECT                      ] = { KEY_ENTER };
 		uinputCecMap[CEC_USER_CONTROL_CODE_UP                          ] = { KEY_UP };
 		uinputCecMap[CEC_USER_CONTROL_CODE_DOWN                        ] = { KEY_DOWN };
 		uinputCecMap[CEC_USER_CONTROL_CODE_LEFT                        ] = { KEY_LEFT };
@@ -259,7 +259,7 @@ const std::vector<list<__u16>> & Main::setupUinputMap() {
 		uinputCecMap[CEC_USER_CONTROL_CODE_SETUP_MENU                  ] = { KEY_SETUP };
 		uinputCecMap[CEC_USER_CONTROL_CODE_CONTENTS_MENU               ] = { KEY_MENU };
 		uinputCecMap[CEC_USER_CONTROL_CODE_FAVORITE_MENU               ] = { KEY_FAVORITES };
-		uinputCecMap[CEC_USER_CONTROL_CODE_EXIT                        ] = { KEY_EXIT };
+		uinputCecMap[CEC_USER_CONTROL_CODE_EXIT                        ] = { KEY_BACK };
 		uinputCecMap[CEC_USER_CONTROL_CODE_NUMBER0                     ] = { KEY_0 };
 		uinputCecMap[CEC_USER_CONTROL_CODE_NUMBER1                     ] = { KEY_1 };
 		uinputCecMap[CEC_USER_CONTROL_CODE_NUMBER2                     ] = { KEY_2 };
@@ -288,8 +288,8 @@ const std::vector<list<__u16>> & Main::setupUinputMap() {
 		uinputCecMap[CEC_USER_CONTROL_CODE_VOLUME_DOWN                 ] = { KEY_VOLUMEDOWN };
 		uinputCecMap[CEC_USER_CONTROL_CODE_MUTE                        ] = { KEY_MUTE };
 		uinputCecMap[CEC_USER_CONTROL_CODE_PLAY                        ] = { KEY_PLAY };
-		uinputCecMap[CEC_USER_CONTROL_CODE_STOP                        ] = { KEY_STOP };
-		uinputCecMap[CEC_USER_CONTROL_CODE_PAUSE                       ] = { KEY_PAUSE };
+		uinputCecMap[CEC_USER_CONTROL_CODE_STOP                        ] = { KEY_X };
+		uinputCecMap[CEC_USER_CONTROL_CODE_PAUSE                       ] = { KEY_SPACE };
 		uinputCecMap[CEC_USER_CONTROL_CODE_RECORD                      ] = { KEY_RECORD };
 		uinputCecMap[CEC_USER_CONTROL_CODE_REWIND                      ] = { KEY_REWIND };
 		uinputCecMap[CEC_USER_CONTROL_CODE_FAST_FORWARD                ] = { KEY_FASTFORWARD };
@@ -318,8 +318,8 @@ const std::vector<list<__u16>> & Main::setupUinputMap() {
 		uinputCecMap[CEC_USER_CONTROL_CODE_POWER_TOGGLE_FUNCTION       ] = { KEY_POWER };
 		uinputCecMap[CEC_USER_CONTROL_CODE_POWER_OFF_FUNCTION          ] = { KEY_POWER2 };
 		uinputCecMap[CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION           ] = { KEY_WAKEUP };
-		uinputCecMap[CEC_USER_CONTROL_CODE_F1_BLUE                     ] = { KEY_BLUE };
-		uinputCecMap[CEC_USER_CONTROL_CODE_F2_RED                      ] = { KEY_RED };
+		uinputCecMap[CEC_USER_CONTROL_CODE_F1_BLUE                     ] = { KEY_COMPOSE };
+		uinputCecMap[CEC_USER_CONTROL_CODE_F2_RED                      ] = { KEY_ESC };
 		uinputCecMap[CEC_USER_CONTROL_CODE_F3_GREEN                    ] = { KEY_GREEN };
 		uinputCecMap[CEC_USER_CONTROL_CODE_F4_YELLOW                   ] = { KEY_YELLOW };
 		uinputCecMap[CEC_USER_CONTROL_CODE_F5                          ] = { };

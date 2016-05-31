@@ -18,7 +18,7 @@ static const char *uinput_filename[] = {"/dev/uinput", "/dev/input/uinput", "/de
 
 static Logger logger = Logger::getInstance("uinput");
 
-UInput::UInput(const char *dev_name, const std::vector< std::list<__u16> > & keys) : fd(-1) {
+UInput::UInput(const char *dev_name, std::vector<__u16> keys) : fd(-1) {
 	openAll();
 	setup(dev_name, keys);
 	create();
@@ -69,7 +69,7 @@ void UInput::openAll() {
 	}
 }
 
-void UInput::setup(const char *dev_name, const std::vector< std::list<__u16> > & keys) {
+void UInput::setup(const char *dev_name, std::vector<__u16> keys) {
 
 	int ret;
 	struct uinput_user_dev uidev;
@@ -77,9 +77,6 @@ void UInput::setup(const char *dev_name, const std::vector< std::list<__u16> > &
 
 	strncpy(uidev.name, dev_name, UINPUT_MAX_NAME_SIZE);
 	uidev.id.bustype = BUS_USB;
-	uidev.id.vendor  = 1337;
-	uidev.id.product = 1337;
-	uidev.id.version = 1337;
 
 	ret = write(this->fd, &uidev, sizeof(uidev));
 	if (ret != sizeof(uidev)) {
@@ -89,16 +86,20 @@ void UInput::setup(const char *dev_name, const std::vector< std::list<__u16> > &
 
 	// We only want to send keypresses
 	ret  = ioctl(this->fd, UI_SET_EVBIT, EV_KEY);
+	ret  = ioctl(this->fd, UI_SET_EVBIT, EV_REP);
+	ret  = ioctl(this->fd, UI_SET_EVBIT, EV_REL);
+
+	for(int key = 1; key <= KEY_MAX; key++) {
+		assert(ioctl(this->fd, UI_SET_KEYBIT, key) == 0);
+	}
 
 	// Add all the keys we might use
-	for (std::vector< std::list<__u16> >::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-		const std::list<__u16> & kk = *i;
-		for (std::list<__u16>::const_iterator k = kk.begin(); k != kk.end(); ++k) {
-			__u16 ukey = *k;
-			if (ukey != KEY_RESERVED)
-				ret |= ioctl(this->fd, UI_SET_KEYBIT, ukey);
-		}
-	}
+//	for (std::vector<__u16>::const_iterator i = keys.begin(); i != keys.end(); i++) {
+//		if (*i != KEY_RESERVED)
+//			ret |= ioctl(this->fd, UI_SET_KEYBIT, *i);
+//	}
+
+
 
 	if (ret) {
     	throw std::runtime_error("Failed to setup uinput");

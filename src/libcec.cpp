@@ -15,7 +15,6 @@
  *
  */
 #include "libcec.h"
-#include "hdmi.h"
 
 #include <cstdio>
 #include <iostream>
@@ -31,9 +30,9 @@ using namespace CEC;
 using namespace log4cplus;
 
 using std::endl;
+using std::hex;
 using std::map;
 using std::ostream;
-using std::string;
 
 // cecloader has to be after some #includes and using namespaces :(
 using std::cout;
@@ -42,13 +41,11 @@ using std::cerr;
 
 static Logger logger = Logger::getInstance("libcec");
 
-#define MAX_CEC_PORTS (CEC_MAX_HDMI_PORTNUMBER-CEC_MIN_HDMI_PORTNUMBER)
-
 // Map of control codes to Strings
 const map<enum cec_user_control_code, const char *> Cec::cecUserControlCodeName = Cec::setupUserControlCodeName();
 
 // We store a global handle, so we can use g_cec->ToString(..) in certain cases. This is a bit of a HACK :(
-static ICECAdapter * g_cec = NULL;
+ICECAdapter * g_cec = NULL;
 
 int cecLogMessage(void *cbParam, const cec_log_message message) {
 	try {
@@ -71,31 +68,11 @@ int cecCommand(void *cbParam, const cec_command command) {
 	return 0;
 }
 
-int cecAlert(void *cbParam, const libcec_alert alert, const libcec_parameter param) {
-	try {
-		return ((CecCallback*) cbParam)->onCecAlert(alert, param);
-	} catch (...) {}
-	return 0;
-}
-
 int cecConfigurationChanged(void *cbParam, const libcec_configuration configuration) {
 	try {
 		return ((CecCallback*) cbParam)->onCecConfigurationChanged(configuration);
 	} catch (...) {}
 	return 0;
-}
-
-int cecMenuStateChanged(void *cbParam, const cec_menu_state menu_state) {
-	try {
-		return ((CecCallback*) cbParam)->onCecMenuStateChanged(menu_state);
-	} catch (...) {}
-	return 0;
-}
-
-void cecSourceActivated(void *cbParam, const cec_logical_address address, const uint8_t val) {
-	try {
-		return ((CecCallback*) cbParam)->onCecSourceActivated(address, val);
-	} catch (...) {}
 }
 
 struct ICECAdapterDeleter : std::default_delete<ICECAdapter> {
@@ -131,69 +108,47 @@ public:
 	}
 };
 
-Cec::Cec(const char * name, CecCallback * callback)
-{
+ICECAdapter * Cec::CecInit(const char * name, CecCallback * callback) {
 	assert(name != NULL);
 	assert(callback != NULL);
 
 	config.Clear();
 
-	config.clientVersion = LIBCEC_VERSION_CURRENT;
-
+	config.deviceTypes.Add(CEC_DEVICE_TYPE_PLAYBACK_DEVICE);
 	strncpy(config.strDeviceName, name, sizeof(config.strDeviceName));
-	config.deviceTypes.Add(CEC_DEVICE_TYPE_RECORDING_DEVICE);
-
-	config.bAutodetectAddress = CEC_DEFAULT_SETTING_AUTODETECT_ADDRESS;
-	config.iPhysicalAddress = CEC_INVALID_PHYSICAL_ADDRESS;
-	config.baseDevice = CECDEVICE_UNKNOWN;
-	config.iHDMIPort = CEC_HDMI_PORTNUMBER_NONE;
-	config.bUseTVMenuLanguage = 0;
-	config.bActivateSource = 0;
-	config.bPowerOffScreensaver = 0;
-	config.bPowerOnScreensaver = 0;
-	config.bSendInactiveSource = 0;
-	config.bPowerOffOnStandby = 0;
-	config.bShutdownOnStandby = 0;
-	config.iDoubleTapTimeout50Ms = 0;
 
 	callbacks.CBCecLogMessage           = &::cecLogMessage;
 	callbacks.CBCecKeyPress             = &::cecKeyPress;
 	callbacks.CBCecCommand              = &::cecCommand;
 	callbacks.CBCecConfigurationChanged = &::cecConfigurationChanged;
-	callbacks.CBCecAlert                = &::cecAlert;
-	callbacks.CBCecMenuStateChanged     = &::cecMenuStateChanged;
-	callbacks.CBCecSourceActivated      = &::cecSourceActivated;
 	config.callbackParam                = callback;
 	config.callbacks                    = &callbacks;
+
+	// LibCecInitialise is noisy, so we redirect cout to nowhere
+	RedirectStreamBuffer redirect(cout, 0);
+	return g_cec = (ICECAdapter *)LibCecInitialise(&config);
+}
+
+Cec::Cec(const char * name, CecCallback * callback) :
+	cec(CecInit(name, callback), ICECAdapterDeleter())
+{
+	if (cec == NULL) {
+		throw std::runtime_error("Failed to initialise libCEC");
+	}
+	cec->InitVideoStandalone();
 }
 
 Cec::~Cec() {}
 
-void Cec::init()
-{
-    if (! cec)
-    {
-        // LibCecInitialise is noisy, so we redirect cout to nowhere
-        RedirectStreamBuffer redirect(cout, 0);
-        g_cec = LibCecInitialise(&config);
-        if (! g_cec) {
-            throw std::runtime_error("Failed to initialise libCEC");
-        }
-        cec = std::unique_ptr<CEC::ICECAdapter>(g_cec, ICECAdapterDeleter());
-        cec->InitVideoStandalone();
-    }
-}
 
-CEC::cec_logical_address Cec::open(const std::string &name) {
+void Cec::open() {
 	LOG4CPLUS_TRACE_STR(logger, "Cec::open()");
-	int id = 0;
 
-	init();
+	assert(cec != NULL);
 
 	// Search for adapters
-	cec_adapter devices[MAX_CEC_PORTS];
-
-	uint8_t ret = cec->FindAdapters(devices, MAX_CEC_PORTS, NULL);
+	cec_adapter devices[10];
+	uint8_t ret = cec->FindAdapters(devices, 10, NULL);
 	if (ret < 0) {
 		throw std::runtime_error("Error occurred searching for adapters");
 	}
@@ -202,65 +157,26 @@ CEC::cec_logical_address Cec::open(const std::string &name) {
 		throw std::runtime_error("No adapters found");
 	}
 
-	if( ! name.empty() )
-	{
-        LOG4CPLUS_INFO(logger, "Looking for " << name);
-		for(id=0; id<ret; ++id)
-		{
-			if( name.compare(devices[id].path) == 0 )
-				break;
-			if( name.compare(devices[id].comm) == 0 )
-				break;
-		}
-		if( id == ret )
-		{
-			throw std::runtime_error("adapter not found");
-		}
-	}
-
 	// Just use the first found
-	LOG4CPLUS_INFO(logger, "Openning " << devices[id].path);
-
-	if (!cec->Open(devices[id].comm)) {
+	if (!cec->Open(devices[0].comm)) {
 		throw std::runtime_error("Failed to open adapter");
 	}
 
-	LOG4CPLUS_INFO(logger, "Opened " << devices[id].path);
-	/* return logical address as negociated by libcec */
-	return (cec->GetLogicalAddresses()).primary;
+	LOG4CPLUS_INFO(logger, "Opened " << devices[0].path);
 }
 
-void Cec::close(bool makeInactive) {
-	assert(cec);
-
-    if (makeInactive)
-        cec->SetInactiveView();
-    cec->Close();
-}
-
-void Cec::setTargetAddress(const HDMI::address & address) {
-	LOG4CPLUS_INFO(logger, "Physical Address is set to " << address.physical);
-    config.iPhysicalAddress = address.physical;
-	LOG4CPLUS_INFO(logger, "Base device is set to " << address.logical);
-	config.baseDevice = address.logical;
-	LOG4CPLUS_INFO(logger, "HDMI port is set to " << (int)address.port);
-	config.iHDMIPort = address.port;
+void Cec::close() {
+	cec->SetInactiveView();
+	cec->Close();
 }
 
 void Cec::makeActive() {
-	assert(cec);
-
 	// and made active
 	if (!cec->SetActiveSource(config.deviceTypes[0])) {
 		throw std::runtime_error("Failed to become active");
 	}
 }
 
-bool Cec::ping() {
-	assert(cec);
-
-    return cec->PingAdapter();
-}
 
 
 /**
@@ -268,11 +184,8 @@ bool Cec::ping() {
  * This will close any open device!
  */
 ostream & Cec::listDevices(ostream & out) {
-	cec_adapter devices[MAX_CEC_PORTS];
-
-    init();
-
-	int8_t ret = cec->FindAdapters(devices, MAX_CEC_PORTS, NULL);
+	cec_adapter devices[10];
+	int8_t ret = cec->FindAdapters(devices, 10, NULL);
 	if (ret < 0) {
 		LOG4CPLUS_ERROR(logger, "Error occurred searching for adapters");
 		return out;
@@ -294,12 +207,12 @@ ostream & Cec::listDevices(ostream & out) {
 			if (devices[j]) {
 				cec_logical_address logical_addres = (cec_logical_address) j;
 
-                HDMI::physical_address physical_address(cec->GetDevicePhysicalAddress(logical_addres));
+				uint16_t physical_address = cec->GetDevicePhysicalAddress(logical_addres);
 				cec_osd_name name = cec->GetDeviceOSDName(logical_addres);
 				cec_vendor_id vendor = (cec_vendor_id) cec->GetDeviceVendorId(logical_addres);
 
 				out << "\t"  << cec->ToString(logical_addres)
-				    << "@"  << physical_address
+				    << "@0x" << hex << physical_address
 				    << " "   << name.name << " (" << cec->ToString(vendor) << ")"
 				    << endl;
 			}
@@ -442,21 +355,12 @@ std::ostream& operator<<(std::ostream &out, const cec_command & cmd) {
 //  int8_t              opcode_set;       /**< 1 when an opcode is set, 0 otherwise (POLL message) */
 //  int32_t             transmit_timeout; /**< the timeout to use in ms */
 
-	return out << "Command "
-			<< cmd.initiator << "->" << cmd.destination
-			<< "[" << (cmd.ack ? "A" : " ") << (cmd.eom ? "A" : " ") << "]"
-			<< " " << cmd.opcode;
+	return out << "Command " << cmd.initiator << " to " << cmd.destination << " " << cmd.opcode;
 }
 
 std::ostream& operator<<(std::ostream &out, const cec_opcode & opcode) {
 	if (g_cec)
 		return out << g_cec->ToString(opcode);
-	return out << "UNKNOWN";
-}
-
-std::ostream& operator<<(std::ostream &out, const cec_logical_address & address) {
-	if (g_cec)
-		return out << g_cec->ToString(address);
 	return out << "UNKNOWN";
 }
 
